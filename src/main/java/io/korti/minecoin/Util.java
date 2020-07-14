@@ -1,8 +1,10 @@
 package io.korti.minecoin;
 
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
+import java.security.*;
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.List;
 
 public class Util {
 
@@ -22,6 +24,53 @@ public class Util {
         } catch (NoSuchAlgorithmException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public static byte[] applySHA256RSASig(PrivateKey key, String input) {
+        try {
+            Signature sig = Signature.getInstance("SHA256withRSA");
+            sig.initSign(key);
+            sig.update(input.getBytes());
+            return sig.sign();
+        } catch (NoSuchAlgorithmException | InvalidKeyException | SignatureException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static boolean verifySHA256RSASig(PublicKey key, String data, byte[] signature) {
+        try {
+            Signature sig = Signature.getInstance("SHA256withRSA");
+            sig.initVerify(key);
+            sig.update(data.getBytes());
+            return sig.verify(signature);
+        } catch (NoSuchAlgorithmException | InvalidKeyException | SignatureException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static String keyToString(Key key) {
+        return Base64.getEncoder().encodeToString(key.getEncoded());
+    }
+
+    public static String getMerkelRoot(List<Transaction> transactions) {
+        int count = transactions.size();
+        List<String> prevTreeLayer = new ArrayList<>();
+
+        for(Transaction transaction : transactions) {
+            prevTreeLayer.add(transaction.getId());
+        }
+
+        List<String> treeLayer = prevTreeLayer;
+        while (count > 1) {
+            treeLayer = new ArrayList<>();
+            for (int i = 1; i < prevTreeLayer.size(); i++) {
+                treeLayer.add(toSHA256(prevTreeLayer.get(i - 1) + prevTreeLayer.get(i)));
+            }
+            count = treeLayer.size();
+            prevTreeLayer = treeLayer;
+        }
+
+        return (treeLayer.size() == 1) ? treeLayer.get(0) : "";
     }
 
 }
